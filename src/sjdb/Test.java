@@ -1,7 +1,12 @@
 package sjdb;
+<<<<<<< HEAD
 import java.io.*;
 import java.util.ArrayList;
 import sjdb.DatabaseException;
+=======
+import java.util.ArrayList;
+
+>>>>>>> f73a43fb835b3d8295667cd2e082d6e21a1d1e66
 public class Test {
     private Catalogue catalogue;
 
@@ -9,6 +14,7 @@ public class Test {
     }
 
     public static void main(String[] args) throws Exception {
+<<<<<<< HEAD
         Catalogue catalogue = createCatalogue();
         Inspector inspector = new Inspector();
         Estimator estimator = new Estimator();
@@ -22,6 +28,22 @@ public class Test {
         planopt.accept(estimator);
         planopt.accept(inspector);
     }
+=======
+    Catalogue catalogue = createCatalogue();
+    Inspector inspector = new Inspector();
+    Estimator estimator = new Estimator();
+
+    Operator plan = query(catalogue);
+    plan.accept(estimator);
+    plan.accept(inspector);
+
+    System.out.println("--- OPTIMISED PLAN ---");
+    Optimiser optimiser = new Optimiser(catalogue);
+    Operator planopt = optimiser.optimise(plan);
+    planopt.accept(estimator);
+    planopt.accept(inspector);
+}
+>>>>>>> f73a43fb835b3d8295667cd2e082d6e21a1d1e66
 
     public static Catalogue createCatalogue() {
         Catalogue cat = new Catalogue();
