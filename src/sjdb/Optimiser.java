@@ -13,6 +13,7 @@ import java.util.Set;
 public class Optimiser {
     private Catalogue catalogue;
     private Map<String, String> owner = new HashMap<String, String>();
+    private Set<String> requiredAttributes = new HashSet<String>();
 
     public Optimiser(Catalogue catalogue) {
         this.catalogue = catalogue;
@@ -37,6 +38,7 @@ public class Optimiser {
         ArrayList<NamedRelation> relations = new ArrayList<NamedRelation>();
         collectRelations(root, relations);
         buildOwners(relations);
+        buildRequiredAttributes(projection, predicates);
 
         ArrayList<State> states = new ArrayList<State>();
         for (NamedRelation rel : relations) {
@@ -77,6 +79,22 @@ public class Optimiser {
 
         return current.op;
     }
+// Builds the set of required attributes based on the projection and the predicates. We need to keep track of this so that we can push projections down to the base relations and only keep the attributes that are needed for the final result, which can help reduce the size of intermediate results and make joins cheaper. We also need to include any attributes that are used in predicates, even if they are not in the final projection, because they will be needed for evaluating those predicates. --- IGNORE ---
+    private void buildRequiredAttributes(List<Attribute> projection, List<Predicate> predicates) {
+        requiredAttributes.clear();
+
+        for (Attribute a : projection) {
+            requiredAttributes.add(attrName(a));
+        }
+
+        for (Predicate p : predicates) {
+            requiredAttributes.add(attrName(left(p)));
+            Attribute r = right(p);
+            if (r != null) {
+                requiredAttributes.add(attrName(r));
+            }
+        }
+    }
 // Creates a base state for a relation, which is just a scan of that relation with any local predicates applied. We also populate the values map with the initial value counts for each attribute, which will be used for estimating the costs of joins and selects later on. --- IGNORE ---
     private State baseState(NamedRelation rel, List<Predicate> predicates) {
         State s = new State();
@@ -96,7 +114,30 @@ public class Optimiser {
             }
         }
 
+        pushProjection(s);
         return s;
+    }
+// Pushes a projection down to the base relations if possible, by looking at the required attributes and only keeping those in the projection. This can help reduce the size of intermediate results and make joins cheaper, especially if there are many attributes that are not needed for the final result. We also update the values map to only include the projected attributes, which will help with estimating join costs later on. --- IGNORE ---
+    private void pushProjection(State s) {
+        ArrayList<Attribute> kept = new ArrayList<Attribute>();
+        HashMap<String, Integer> projectedValues = new HashMap<String, Integer>();
+
+        for (String name : new ArrayList<String>(s.values.keySet())) {
+            if (requiredAttributes.contains(name)) {
+                Attribute copy = new Attribute(name);
+                setValues(copy, s.values.get(name).intValue());
+                kept.add(copy);
+                projectedValues.put(name, s.values.get(name));
+            }
+        }
+
+        if (kept.isEmpty() || kept.size() == s.values.size()) {
+            return;
+        }
+
+        s.op = new Project(s.op, kept);
+        s.values.clear();
+        s.values.putAll(projectedValues);
     }
 // Collects all the base relations in the plan by traversing it recursively. We assume that the base relations are represented by Scan operators, and that any Products or Joins will have two inputs that we need to traverse. --- IGNORE ---
     private void collectRelations(Operator op, List<NamedRelation> rels) {
